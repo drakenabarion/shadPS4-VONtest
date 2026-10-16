@@ -1097,11 +1097,17 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
         auto& image = texture_cache.GetImage(image_id);
 
         const auto slice = image_view.info.range.base.layer;
+        // Correct stencil rendering by clearing at appropriate timings alongside existing depth
+        // buffer clearing. Relevant when stencil compression is enabled.
+        const bool is_meta_cleared = texture_cache.IsMetaCleared(htile_address, slice);
         const bool is_depth_clear =
             (regs.depth_render_control.depth_clear_enable && regs.depth_control.depth_enable &&
              regs.depth_control.depth_write_enable) ||
-            texture_cache.IsMetaCleared(htile_address, slice);
-        const bool is_stencil_clear = regs.depth_render_control.stencil_clear_enable;
+            is_meta_cleared;
+        const bool is_stencil_clear =
+            regs.depth_render_control.stencil_clear_enable ||
+            (is_meta_cleared && regs.depth_buffer.z_info.tile_surface_enable &&
+             !regs.depth_buffer.stencil_info.tile_stencil_disable);
         texture_cache.TouchMeta(htile_address, slice, false);
         ASSERT(desc.view_info.range.extent.levels == 1 && !image.binding.needs_rebind);
 
