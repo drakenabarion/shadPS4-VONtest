@@ -1218,6 +1218,12 @@ void Rasterizer::FillBuffer(VAddr address, u32 num_bytes, u32 value, bool is_gds
 }
 
 void Rasterizer::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, bool src_gds) {
+    if (!dst_gds && !src_gds && dst == src) {
+        // A copy onto itself leaves memory unchanged. Invalidating the range would reload any
+        // image there from guest memory, losing what the GPU rendered into it (Virtual-On Force
+        // copies its freshly drawn shadow masks onto themselves).
+        return;
+    }
     if (!dst_gds && !buffer_cache.IsRegionGpuModified(dst, num_bytes)) {
         if (!src_gds && !buffer_cache.IsRegionGpuModified(src, num_bytes) &&
             !texture_cache.FindImageFromRange(src, num_bytes)) {
